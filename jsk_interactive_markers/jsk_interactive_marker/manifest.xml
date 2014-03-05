@@ -26,7 +26,7 @@
   <rosdep name="eigen_conversions" />
   <rosdep name="orocos_kdl" />
   <rosdep name="rviz" />
-  <rosdep name="jsk_interactive_marker" />
+  <rosdep name="interactive_marker" />
 </package>
 
 
