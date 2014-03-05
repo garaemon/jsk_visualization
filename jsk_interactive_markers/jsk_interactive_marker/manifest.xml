@@ -19,7 +19,12 @@
   <depend package="actionlib" />
   <depend package="jsk_pcl_ros" />
   <depend package="eigen_conversions" />
+  <rosdep name="tinyxml" />
   <rosdep name="eigen" />
+  <rosdep name="cmake_modules" />
+  <rosdep name="tf_conversions" />
+  <rosdep name="eigen_conversions" />
+  <rosdep name="orocos_kdl" />
 </package>
 
 
