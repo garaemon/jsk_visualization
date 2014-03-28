@@ -15,7 +15,7 @@ add_service_files(DIRECTORY srv
   FILES MarkerSetPose.srv SetPose.srv)
 
 generate_messages(
-  DEPENDENCIES geometry_msgs jsk_footstep_msgs visualization_msgs
+  DEPENDENCIES geometry_msgs jsk_footstep_msgs visualization_msgs jsk_pcl_ros
 )
 
 catkin_package(
