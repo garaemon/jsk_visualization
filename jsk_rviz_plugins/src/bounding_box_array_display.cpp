@@ -38,6 +38,7 @@ namespace jsk_rviz_plugin
 {
   BoundingBoxArrayDisplay::BoundingBoxArrayDisplay()
   {
+    cursor_ = rviz::getDefaultCursor();
     color_property_ = new rviz::ColorProperty("color", QColor(25, 255, 0),
                                               "color to draw the bounding boxes",
                                               this, SLOT(updateColor()));
@@ -260,6 +261,16 @@ namespace jsk_rviz_plugin
         edge->addPoint(D); edge->addPoint(H);
       }
     }
+  }
+
+  void BoundingBoxArrayDisplay::enableInteraction( bool enable )
+  {
+    ROS_INFO("enableInteraction");
+  }
+
+  void BoundingBoxArrayDisplay::handleMouseEvent( rviz::ViewportMouseEvent& event )
+  {
+    ROS_INFO("handleMouseEvent");
   }
 }
 

@@ -44,10 +44,13 @@
 #include <rviz/ogre_helpers/shape.h>
 #include <rviz/ogre_helpers/billboard_line.h>
 #include <OGRE/OgreSceneNode.h>
+#include <rviz/interactive_object.h>
+#include <rviz/load_resource.h>
 
 namespace jsk_rviz_plugin
 {
-  class BoundingBoxArrayDisplay: public rviz::MessageFilterDisplay<jsk_pcl_ros::BoundingBoxArray>
+  class BoundingBoxArrayDisplay: public rviz::MessageFilterDisplay<jsk_pcl_ros::BoundingBoxArray>,
+                                 public rviz::InteractiveObject
   {
     Q_OBJECT
   public:
@@ -55,7 +58,12 @@ namespace jsk_rviz_plugin
     typedef boost::shared_ptr<rviz::BillboardLine> BillboardLinePtr;
     BoundingBoxArrayDisplay();
     virtual ~BoundingBoxArrayDisplay();
+    virtual bool isInteractive() {return true;};
+    virtual void enableInteraction( bool enable );
+    virtual void handleMouseEvent( rviz::ViewportMouseEvent& event );
+    virtual const QCursor& getCursor() const { return cursor_; }
   protected:
+    QCursor cursor_;
     virtual void onInitialize();
     virtual void reset();
     void allocateShapes(int num);
