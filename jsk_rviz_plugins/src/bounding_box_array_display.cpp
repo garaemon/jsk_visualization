@@ -36,6 +36,48 @@
 
 namespace jsk_rviz_plugin
 {
+  BoundingBoxSelectionHandler::BoundingBoxSelectionHandler(DisplayContext* context):
+    rviz::SelectionHandler( context )
+  {
+    
+  }
+
+  BoundingBoxSelectionHandler::~BoundingBoxSelectionHandler()
+  {
+
+  }
+  
+  Ogre::Vector3 BoundingBoxSelectionHandler::getPosition()
+  {
+    return Ogre::Vector3( box_msg_.pose.position.x,
+                          box_msg_.pose.position.y,
+                          box_msg_.pose.position.z );
+  }
+
+  Ogre::Quaternion BoundingBoxSelectionHandler::getOrientation()
+  {
+    return Ogre::Quaternion( box_msg_.pose.orientation.w,
+                             box_msg_.pose.orientation.x,
+                             box_msg_.pose.orientation.y,
+                             box_msg_.pose.orientation.z );
+  }
+
+  void BoundingBoxSelectionHandler::updateMsg(const jsk_pcl_ros::BoundingBox& msg)
+  {
+    box_msg_ = msg;
+  }
+  
+  // void BoundingBoxSelectionHandler::createProperties( const Picked& obj, Property* parent_property )
+  // {
+
+  // }
+  
+  // void BoundingBoxSelectionHandler::updateProperties()
+  // {
+  //   // position_property_->setVector( getPosition() );
+  //   // orientation_property_->setQuaternion( getOrientation() );
+  // }
+  
   BoundingBoxArrayDisplay::BoundingBoxArrayDisplay()
   {
     color_property_ = new rviz::ColorProperty("color", QColor(25, 255, 0),
@@ -123,6 +165,20 @@ namespace jsk_rviz_plugin
     shapes_.clear();
   }
 
+  void BoundingBoxArrayDisplay::allocateHandlers(int num)
+  {
+    if (num > handlers_.size()) {
+      for (size_t i = handlers_.size(); i< num; i++) {
+        BoundingBoxSelectionHandler::Ptr
+          handler (new BoundingBoxSelectionHandler(context_));
+        handlers_.push_back(handler);
+      }
+    }
+    else if (num < handlers_.size()) {
+      handler_.resize(num);
+    }
+  }
+  
   void BoundingBoxArrayDisplay::allocateShapes(int num)
   {
     if (num > shapes_.size()) {
@@ -132,8 +188,7 @@ namespace jsk_rviz_plugin
         shapes_.push_back(shape);
       }
     }
-    else if (num < shapes_.size())
-    {
+    else if (num < shapes_.size()) {
       shapes_.resize(num);
     }
   }
@@ -146,19 +201,20 @@ namespace jsk_rviz_plugin
         edges_.push_back(line);
       }
     }
-    else if (num < edges_.size())
-    {
+    else if (num < edges_.size()) {
       edges_.resize(num);       // ok??
     }
   }
 
   void BoundingBoxArrayDisplay::processMessage(const jsk_pcl_ros::BoundingBoxArray::ConstPtr& msg)
   {
+    allocateHandlers(msg->boxes.size());
     if (!only_edge_) {
       edges_.clear();
       allocateShapes(msg->boxes.size());
       for (size_t i = 0; i < msg->boxes.size(); i++) {
         jsk_pcl_ros::BoundingBox box = msg->boxes[i];
+        BoundingBoxSelectionHandler::Ptr handler = handlers_[i];
         ShapePtr shape = shapes_[i];
         Ogre::Vector3 position;
         Ogre::Quaternion quaternion;
@@ -171,6 +227,13 @@ namespace jsk_rviz_plugin
                      qPrintable( fixed_frame_ ));
           return;                 // return?
         }
+        HandlerObjectMap::iterator it = handler_tracking_objects_.find(handler);
+        if (it != handler_tracking_objects_.end()) {
+          handler->removeTrackedObject(it->second);
+        }
+        handler->updateMsg(box);
+        handler->addTrackedObjects(shape->getRootNode());
+        handler_tracking_objects_[handler] = shape->getRootNode();
         shape->setPosition(position);
         shape->setOrientation(quaternion);
         Ogre::Vector3 dimensions;
@@ -191,7 +254,7 @@ namespace jsk_rviz_plugin
       for (size_t i = 0; i < msg->boxes.size(); i++) {
         jsk_pcl_ros::BoundingBox box = msg->boxes[i];
         geometry_msgs::Vector3 dimensions = box.dimensions;
-      
+        BoundingBoxSelectionHandler::Ptr handler = handlers_[i];
         BillboardLinePtr edge = edges_[i];
         edge->clear();
         Ogre::Vector3 position;
@@ -205,6 +268,13 @@ namespace jsk_rviz_plugin
                      qPrintable( fixed_frame_ ));
           return;                 // return?
         }
+        HandlerObjectMap::iterator it = handler_tracking_objects_.find(handler);
+        if (it != handler_tracking_objects_.end()) {
+          handler->removeTrackedObject(it->second);
+        }
+        handler->addTrackedObjects(edge->getRootNode());
+        handler_tracking_objects_[handler] = edge->getRootNode();
+        handler->updateMsg(box);
         edge->setPosition(position);
         edge->setOrientation(quaternion);
 

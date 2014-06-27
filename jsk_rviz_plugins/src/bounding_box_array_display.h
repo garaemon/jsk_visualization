@@ -44,22 +44,39 @@
 #include <rviz/ogre_helpers/shape.h>
 #include <rviz/ogre_helpers/billboard_line.h>
 #include <OGRE/OgreSceneNode.h>
+#include <rviz/selection_handler.h>
 
 namespace jsk_rviz_plugin
 {
+  class BoundingBoxSelectionHandler: public rviz::SelectionHandler
+  {
+    
+    BoundingBoxSelectionHandler(DisplayContext* context);
+    virtual ~BoundingBoxSelectionHandler();
+    Ogre::Vector3 getPosition();
+    Ogre::Quaternion getOrientation();
+    virtual void updateMsg(const jsk_pcl_ros::BoundingBox& msg);
+    // virtual void createProperties( const Picked& obj, Property* parent_property );
+    // virtual void updateProperties();
+  protected:
+      jsk_pcl_ros::BoundingBox box_msg_;
+  };
+  
   class BoundingBoxArrayDisplay: public rviz::MessageFilterDisplay<jsk_pcl_ros::BoundingBoxArray>
   {
     Q_OBJECT
   public:
     typedef boost::shared_ptr<rviz::Shape> ShapePtr;
     typedef boost::shared_ptr<rviz::BillboardLine> BillboardLinePtr;
+    typedef std::map<BoundingBoxSelectionHandler::Ptr, Ogre::SceneNode*> HandlerObjectMap;
     BoundingBoxArrayDisplay();
     virtual ~BoundingBoxArrayDisplay();
   protected:
     virtual void onInitialize();
     virtual void reset();
-    void allocateShapes(int num);
-    void allocateBillboardLines(int num);
+    virtual void allocateHandlers(int num);
+    virtual void allocateShapes(int num);
+    virtual void allocateBillboardLines(int num);
     QColor getColor(size_t index);
     rviz::ColorProperty* color_property_;
     rviz::FloatProperty* alpha_property_;
@@ -74,6 +91,8 @@ namespace jsk_rviz_plugin
     double line_width_;
     std::vector<ShapePtr> shapes_;
     std::vector<BillboardLinePtr> edges_;
+    std::vector<BoundingBoxSelectionHandler::Ptr> handlers_;
+    HandlerObjectMap handler_tracking_objects_;
   private Q_SLOTS:
     void updateColor();
     void updateAlpha();
