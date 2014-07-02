@@ -68,6 +68,9 @@
 
 #include <image_transport/camera_common.h>
 #include "overlay_camera_display.h"
+
+#include <jsk_pcl_ros/pcl_util.h>
+
 namespace jsk_rviz_plugin
 {
 using namespace rviz;
@@ -93,6 +96,7 @@ OverlayCameraDisplay::OverlayCameraDisplay()
   , new_caminfo_( false )
   , force_render_( false )
   , caminfo_ok_(false)
+  , require_update_(false)
 {
   image_position_property_ = new EnumProperty( "Image Rendering", BOTH,
                                                "Render the image behind all other geometry or overlay it on top, or both.",
@@ -381,6 +385,10 @@ void OverlayCameraDisplay::clear()
 
 void OverlayCameraDisplay::update( float wall_dt, float ros_dt )
 {
+  if (!require_update_) {
+    return;
+  }
+  require_update_ = false;
   try
   {
     if( texture_.update() || force_render_ )
@@ -414,30 +422,23 @@ void OverlayCameraDisplay::update( float wall_dt, float ros_dt )
 
 void OverlayCameraDisplay::redraw()
 {
-  Ogre::RenderTarget *rt = render_panel_->getRenderWindow();
-  int width = rt->getWidth();
-  int height = rt->getHeight();
-  Ogre::uchar *data = new Ogre::uchar[width * height * 3];
-  Ogre::PixelBox pb(width, height, 1, Ogre::PF_BYTE_RGB, data);
-  rt->copyContentsToMemory(pb);
-  
-  Ogre::HardwarePixelBufferSharedPtr pixelBuffer = overlay_texture_->getBuffer();
-  pixelBuffer->lock( Ogre::HardwareBuffer::HBL_NORMAL ); // for best performance use HBL_DISCARD!
-  const Ogre::PixelBox& pixelBox = pixelBuffer->getCurrentLock();
-  Ogre::uint8* pDest = static_cast<Ogre::uint8*> ( pixelBox.data );
-  memset( pDest, 0, overlay_texture_->getWidth() * overlay_texture_->getHeight() );
-  //memcpy(data, pdest, overlay_texture_->getWidth() * overlay_texture_->getHeight());
-  QImage Hud( pDest, overlay_texture_->getWidth(),
-              overlay_texture_->getHeight(), QImage::Format_ARGB32 );
-  for (int i = 0; i < overlay_texture_->getWidth(); i++) {
-    for (int j = 0; j < overlay_texture_->getHeight(); j++) {
-      Ogre::ColourValue c = pb.getColourAt(i, j, 0);
-      QColor color(c.r * 255, c.g * 255, c.b * 255, texture_alpha_ * 255);
-      Hud.setPixel(i, j, color.rgba());
-    }
+
+  jsk_pcl_ros::TimeAccumulator time_acc;
+  {
+    jsk_pcl_ros::ScopedTimer timer = time_acc.scopedTimer();
+    Ogre::RenderTarget *rt = render_panel_->getRenderWindow();
+    int width = rt->getWidth();
+    int height = rt->getHeight();
+    data_ = new Ogre::uchar[width * height * 3];
+    Ogre::PixelBox pb(width, height, 1, Ogre::PF_BYTE_RGBA, data_);
+    Ogre::HardwarePixelBufferSharedPtr pixelBuffer = overlay_texture_->getBuffer();
+    pixelBuffer->lock( Ogre::HardwareBuffer::HBL_DISCARD ); // for best performance use HBL_DISCARD!
+    Ogre::PixelBox pixelBox = pixelBuffer->getCurrentLock();
+    rt->copyContentsToMemory(pixelBox, Ogre::RenderTarget::FB_AUTO);
+    delete[] data_;
+    pixelBuffer->unlock();
   }
-  pixelBuffer->unlock();
-  delete[] data;
+  ROS_INFO_STREAM("OverlayCameraDisplay::redraw: " << time_acc.mean());
 }
   
 bool OverlayCameraDisplay::updateCamera()
@@ -595,6 +596,7 @@ bool OverlayCameraDisplay::updateCamera()
 
 void OverlayCameraDisplay::processMessage(const sensor_msgs::Image::ConstPtr& msg)
 {
+  require_update_ = true;
   texture_.addMessage(msg);
 }
 

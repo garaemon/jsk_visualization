@@ -175,12 +175,15 @@ protected:
   int left_, top_;
   float texture_alpha_;
   bool initializedp_;
+  Ogre::uchar* data_;
+  bool require_update_;
 private Q_SLOTS:
   void updateWidth();
   void updateHeight();
   void updateLeft();
   void updateTop();
   void updateTextureAlpha();
+  
 };
 
 }
