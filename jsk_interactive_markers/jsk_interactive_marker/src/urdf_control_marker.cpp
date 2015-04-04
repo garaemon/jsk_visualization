@@ -31,6 +31,7 @@ private:
   ros::Publisher pub_pose_, pub_selected_pose_;
   std::string frame_id_, marker_frame_id_;
   std::string center_marker_;
+  tf::TransformListener tf_listener_;
   std_msgs::ColorRGBA color_;
   bool mesh_use_embedded_materials_;
   double marker_scale_, center_marker_scale_;
@@ -76,8 +77,51 @@ UrdfControlMarker::UrdfControlMarker() : nh_(), pnh_("~"){
     ros::service::waitForService("set_dynamic_tf", -1);
     dynamic_tf_publisher_client_ = nh_.serviceClient<dynamic_tf_publisher::SetDynamicTF>("set_dynamic_tf", true);
   }
+
   pub_pose_ = pnh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
   pub_selected_pose_ = pnh_.advertise<geometry_msgs::PoseStamped>("selected_pose", 1);
+
+  // Waiting for initial tf
+  std::string synchronize_frame;
+  if (pnh_.getParam("synchronize_frame", synchronize_frame)) {
+    ros::Rate r(1.0);
+    while (ros::ok()) {
+      ROS_WARN_THROTTLE(10.0, "[UrdfContrtolMarker] Waiting for transformation %s -> %s", 
+                        synchronize_frame.c_str(),
+                        frame_id_.c_str());
+      ros::Time stamp = ros::Time::now();
+      std::string error_str;
+      if (tf_listener_.waitForTransform(synchronize_frame,
+                                        frame_id_,
+                                        stamp,
+                                        ros::Duration(1.0))) {
+        tf::StampedTransform tf_transform;
+        tf_listener_.lookupTransform(frame_id_,
+                                     synchronize_frame, 
+                                     stamp,
+                                     tf_transform);
+        geometry_msgs::Pose pose;
+        pose.position.x = tf_transform.getOrigin().x();
+        pose.position.y = tf_transform.getOrigin().y();
+        pose.position.z = tf_transform.getOrigin().z();
+        pose.orientation.w = tf_transform.getRotation().w();
+        pose.orientation.x = tf_transform.getRotation().x();
+        pose.orientation.y = tf_transform.getRotation().y();
+        pose.orientation.z = tf_transform.getRotation().z();
+        std_msgs::Header marker_header;
+        marker_header.stamp = ros::Time::now();
+        marker_header.frame_id = synchronize_frame;
+        center_marker_pose_ = pose;
+        markerUpdate(marker_header, pose);
+        ROS_INFO_STREAM("Done! " << pose);
+        break;
+      }
+      else {
+        ros::spinOnce();        // is it required?
+      }
+    }
+  }
+
   sub_set_pose_ = pnh_.subscribe<geometry_msgs::PoseStamped> ("set_pose", 1, boost::bind( &UrdfControlMarker::set_pose_cb, this, _1));
   sub_show_marker_ = pnh_.subscribe<std_msgs::Bool> ("show_marker", 1, boost::bind( &UrdfControlMarker::show_marker_cb, this, _1));
 
@@ -148,7 +192,6 @@ void UrdfControlMarker::makeControlMarker( bool fixed )
   int_marker.scale = marker_scale_;
 
   int_marker.name = "urdf_control_marker";
-
   //add center marker
   if(center_marker_ != ""){
     InteractiveMarkerControl center_marker_control;
@@ -221,7 +264,7 @@ void UrdfControlMarker::makeControlMarker( bool fixed )
   control.name = "move_y";
   control.interaction_mode = InteractiveMarkerControl::MOVE_AXIS;
   int_marker.controls.push_back(control);
-
+  int_marker.pose = center_marker_pose_;
   server_->insert(int_marker);
   server_->setCallback(int_marker.name, boost::bind( &UrdfControlMarker::processFeedback, this, _1));
   marker_menu_.apply(*server_, int_marker.name);
