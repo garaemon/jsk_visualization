@@ -113,7 +113,7 @@ protected:
   void resumeFootstep();
 
   void projectionCallback(const geometry_msgs::PoseStamped& pose);
-
+  void initializeFootstepPose();
   visualization_msgs::Marker makeFootstepMarker(geometry_msgs::Pose pose);
   
   boost::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;

@@ -111,8 +111,6 @@ plan_run_(false), lleg_first_(true) {
   server_.reset( new interactive_markers::InteractiveMarkerServer(ros::this_node::getName()));
   // menu_handler_.insert( "Snap Legs",
   //                       boost::bind(&FootstepMarker::menuFeedbackCB, this, _1));
-  // menu_handler_.insert( "Reset Legs",
-  //                       boost::bind(&FootstepMarker::menuFeedbackCB, this, _1));
   menu_handler_.insert( "Look Ground",
                         boost::bind(&FootstepMarker::menuFeedbackCB, this, _1));
   menu_handler_.insert( "Execute the Plan",
@@ -135,6 +133,8 @@ plan_run_(false), lleg_first_(true) {
                        boost::bind(&FootstepMarker::menuFeedbackCB, this, _1));
   menu_handler_.insert("RLeg First",
                        boost::bind(&FootstepMarker::menuFeedbackCB, this, _1));
+  menu_handler_.insert( "Reset Legs",
+                        boost::bind(&FootstepMarker::menuFeedbackCB, this, _1));
   marker_pose_.header.frame_id = marker_frame_id_;
   marker_pose_.header.stamp = ros::Time::now();
   marker_pose_.pose.orientation.w = 1.0;
@@ -148,33 +148,7 @@ plan_run_(false), lleg_first_(true) {
   rleg_initial_pose_.orientation.w = 1.0;
   
   if (use_initial_reference_) {
-    while (ros::ok()) {
-      try {
-        if (!tf_listener_->waitForTransform(marker_frame_id_, initial_reference_frame_,
-                                            ros::Time(0.0), ros::Duration(10.0))) {
-          ROS_INFO_THROTTLE(1.0,
-                            "waiting for transform %s => %s", marker_frame_id_.c_str(),
-                            initial_reference_frame_.c_str());
-          continue;
-        }
-        ROS_INFO("resolved transform %s => %s", marker_frame_id_.c_str(),
-                 initial_reference_frame_.c_str());
-        tf::StampedTransform transform;
-        tf_listener_->lookupTransform(marker_frame_id_, initial_reference_frame_,
-                                      ros::Time(0), transform);
-        marker_pose_.pose.position.x = transform.getOrigin().x();
-        marker_pose_.pose.position.y = transform.getOrigin().y();
-        marker_pose_.pose.position.z = transform.getOrigin().z();
-        marker_pose_.pose.orientation.x = transform.getRotation().x();
-        marker_pose_.pose.orientation.y = transform.getRotation().y();
-        marker_pose_.pose.orientation.z = transform.getRotation().z();
-        marker_pose_.pose.orientation.w = transform.getRotation().w();
-        break;
-      }
-      catch (tf2::TransformException& e) {
-        ROS_ERROR("Failed to lookup transformation: %s", e.what());
-      }
-    }
+    initializeFootstepPose();
   }
 
   initializeInteractiveMarker();
@@ -218,6 +192,41 @@ plan_run_(false), lleg_first_(true) {
     projection_sub_ = pnh.subscribe("projected_pose", 1,
                                     &FootstepMarker::projectionCallback, this);
   // }
+}
+
+void FootstepMarker::initializeFootstepPose()
+{
+  while (ros::ok()) {
+    try {
+      if (!tf_listener_->waitForTransform(marker_frame_id_, initial_reference_frame_,
+                                          ros::Time(0.0), ros::Duration(10.0))) {
+        ROS_INFO_THROTTLE(1.0,
+                          "waiting for transform %s => %s", marker_frame_id_.c_str(),
+                          initial_reference_frame_.c_str());
+        continue;
+      }
+      ROS_INFO("resolved transform %s => %s", marker_frame_id_.c_str(),
+               initial_reference_frame_.c_str());
+      tf::StampedTransform transform;
+      tf_listener_->lookupTransform(marker_frame_id_, initial_reference_frame_,
+                                    ros::Time(0), transform);
+      marker_pose_.pose.position.x = transform.getOrigin().x();
+      marker_pose_.pose.position.y = transform.getOrigin().y();
+      marker_pose_.pose.position.z = transform.getOrigin().z();
+      marker_pose_.pose.orientation.x = transform.getRotation().x();
+      marker_pose_.pose.orientation.y = transform.getRotation().y();
+      marker_pose_.pose.orientation.z = transform.getRotation().z();
+      marker_pose_.pose.orientation.w = transform.getRotation().w();
+      break;
+    }
+    catch (tf2::TransformException& e) {
+      ROS_ERROR("Failed to lookup transformation: %s", e.what());
+    }
+  }
+  lleg_initial_pose_.position.y = footstep_margin_ / 2.0;
+  lleg_initial_pose_.orientation.w = 1.0;
+  rleg_initial_pose_.position.y = - footstep_margin_ / 2.0;
+  rleg_initial_pose_.orientation.w = 1.0;
 }
 
 void FootstepMarker::configCallback(Config& config, uint32_t level)
@@ -433,23 +442,27 @@ void FootstepMarker::processMenuFeedback(uint8_t menu_entry_id) {
     show_6dof_control_ = !show_6dof_control_;
     break;
   }
-  case 6: {                     // toggle 6dof marker
+  case 6: {
     changePlannerHeuristic(":straight-heuristic");
     break;
   }
-  case 7: {                     // toggle 6dof marker
+  case 7: {
     changePlannerHeuristic(":stepcost-heuristic**");
     break;
   }
-  case 8: {                     // toggle 6dof marker
+  case 8: {
     lleg_first_ = true;
     break;
   }
-  case 9: {                     // toggle 6dof marker
+  case 9: {
     lleg_first_ = false;
     break;
   }
-    
+  case 10: {
+    initializeFootstepPose();
+    current_pose_pub_.publish(marker_pose_);
+    break;
+  }
   default: {
     break;
   }
